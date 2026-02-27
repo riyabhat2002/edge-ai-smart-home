@@ -15,3 +15,6 @@
 - Added Llama.cpp as a submodule
 - Downloaded Llama-3.2-1B-Instruct-Q4_K_M model
 - model works best with the following flags -> -c 512 --no-kv-offload --no-mmap --threads 3 -ctk q8_0 -ctv q8_0 (0.1 t/s to 4.7 t/s)
+
+### 26th Feb:
+- model loading, context init, MQTT setup
