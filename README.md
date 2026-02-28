@@ -1,12 +1,19 @@
 # Edge AI Smart Home Gateway
-## A privacy-first smart home gateway running local AI on Raspberry Pi
+### A privacy-first smart home gateway running local AI on Raspberry Pi
 
-## Using Raspberry Pi 4 to create a privacy first smart home gateway that runs entirely on local hardware with no cloud dependency. It will use an AI model to understand natural language voice commands and control smart home devices
+### Using Raspberry Pi 4 to create a privacy first smart home gateway that runs entirely on local hardware with no cloud dependency. It will use an AI model to understand natural language voice commands and control smart home devices
 
 ## Functionalitites for MVP:
 - A local LLM that understands commands
 - MQTT device control
 - A dashboard to keep track of the commands received and action taken
+
+## Tech Stack
+- Hardware: Raspberry Pi 4
+- Inference Engine: llama.cpp
+- Model: Llama-3.2-1B-Instruct-Q4_K_M (4-bit quantization)
+- Protocol - MQTT for lightweight device orchestration
+- OS - Raspberry Pi OS
 
 ## Development Log
 ### 22nd Feb:
