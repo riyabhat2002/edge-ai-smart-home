@@ -2,7 +2,7 @@
 #include <string>
 #include "llama.h"
 
-int main()
+int main(int argc, char *argv[])
 {
     llama_backend_init();
     std::cout << "Llama backend initialized successfully." << std::endl;
@@ -10,7 +10,7 @@ int main()
     std::string home = std::getenv("HOME");
     std::string model_path = home + "/edge-ai-smart-home/models/Llama-3.2-1B-Instruct-Q4_K_M.gguf";
     llama_model_params model_params = llama_model_default_params();
-    model_params.n_gpu_layers = 0; // Load all layers into VRAM (if possible)
+    model_params.n_gpu_layers = 0; // There is no GPU available, so set to 0 to load all layers into RAM
     model_params.use_mmap = false; // Disable memory mapping for better performance on small models
     llama_model *model = llama_model_load_from_file(model_path.c_str(), model_params);
 
@@ -22,8 +22,8 @@ int main()
     llama_context_params context_params = llama_context_default_params();
     context_params.n_ctx = 512; // Set context size to 512 tokens
     context_params.n_threads = 3; // Use 3 threads for generation
-    context_params.type_k = GGML_TYPE_Q4_0; // Use 4-bit quantization for K cache
-    context_params.type_v = GGML_TYPE_Q4_0; // Use 4-bit quantization for V cache
+    context_params.type_k = GGML_TYPE_Q8_0; // Use 8-bit quantization for K cache
+    context_params.type_v = GGML_TYPE_Q8_0; // Use 8-bit quantization for V cache
 
     llama_context * context = llama_init_from_model(model, context_params);
     
@@ -34,6 +34,41 @@ int main()
         return 1;
     }
     std::cout << "Context initialized successfully." << std::endl;
+
+    const llama_vocab *vocab =  llama_model_get_vocab(model);
+
+    if (vocab == nullptr) {
+        std::cerr << "Failed to retrieve the vocabulary from the model." << std::endl;
+        return 1;
+    }
+
+    std::cin >> std::ws; // Clear any leading whitespace from the input stream
+    std::string text;
+    std::getline(std::cin, text); // Wait for user input before proceeding with tokenization
+    llama_token *tokens;
+    int32_t n_tokens_max = 128;
+    tokens = new llama_token[n_tokens_max];
+    int32_t text_len = text.length(); // Length of the input text "It is dark in here."
+    if(text_len == 0) {
+        std::cerr << "Input text is empty. Please provide a valid input." << std::endl;
+        delete[] tokens;    
+        return 1;
+    }
+    int32_t tokens_count = llama_tokenize(vocab, text.c_str(), text_len, tokens, n_tokens_max,
+                            true,   // add_special
+                            false);  // parse_special
+
+    if (tokens_count < 0) {
+        std::cerr << "Failed to tokenize the input text." << std::endl;
+        delete[] tokens;    
+    } else {
+        std::cout << "Tokenization successful. Number of tokens: " << tokens_count << std::endl;
+        std::cout << "Tokens: ";
+        for (int32_t i = 0; i < tokens_count; ++i) {
+            std::cout << tokens[i] << " ";  
+        }
+        std::cout << std::endl;
+    }
 
     llama_model_free(model);
     llama_backend_free();
