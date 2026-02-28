@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <vector>
 #include "llama.h"
 
 int main(int argc, char *argv[])
@@ -25,7 +26,7 @@ int main(int argc, char *argv[])
     context_params.type_k = GGML_TYPE_Q8_0; // Use 8-bit quantization for K cache
     context_params.type_v = GGML_TYPE_Q8_0; // Use 8-bit quantization for V cache
 
-    llama_context * context = llama_init_from_model(model, context_params);
+    llama_context *context = llama_init_from_model(model, context_params);
     
     if (context == nullptr) {
         std::cerr << "Failed to initialize the context from the model." << std::endl;
@@ -43,32 +44,83 @@ int main(int argc, char *argv[])
     }
 
     std::cin >> std::ws; // Clear any leading whitespace from the input stream
-    std::string text;
-    std::getline(std::cin, text); // Wait for user input before proceeding with tokenization
-    llama_token *tokens;
+    std::string input_text;
+    std::getline(std::cin, input_text); // Wait for user input before proceeding with tokenization
+
     int32_t n_tokens_max = 128;
-    tokens = new llama_token[n_tokens_max];
-    int32_t text_len = text.length(); // Length of the input text "It is dark in here."
+    std::vector<llama_token> token_buffer(n_tokens_max); // Create a buffer to hold the tokens
+    int32_t text_len = input_text.length(); // Length of the input text "It is dark in here."
     if(text_len == 0) {
-        std::cerr << "Input text is empty. Please provide a valid input." << std::endl;
-        delete[] tokens;    
+        std::cerr << "Input text is empty. Please provide a valid input." << std::endl;   
         return 1;
     }
-    int32_t tokens_count = llama_tokenize(vocab, text.c_str(), text_len, tokens, n_tokens_max,
-                            true,   // add_special
-                            false);  // parse_special
+    int32_t tokens_count = llama_tokenize(vocab, input_text.c_str(), text_len, token_buffer.data(), token_buffer.size(),
+                            true,
+                            false); 
 
     if (tokens_count < 0) {
-        std::cerr << "Failed to tokenize the input text." << std::endl;
-        delete[] tokens;    
+        std::cerr << "Failed to tokenize the input text." << std::endl;  
+        return 1;
     } else {
         std::cout << "Tokenization successful. Number of tokens: " << tokens_count << std::endl;
         std::cout << "Tokens: ";
         for (int32_t i = 0; i < tokens_count; ++i) {
-            std::cout << tokens[i] << " ";  
+            std::cout << token_buffer[i] << " ";  
         }
         std::cout << std::endl;
     }
+
+    llama_batch batch = llama_batch_get_one(token_buffer.data(), tokens_count);
+
+    int32_t err_code = llama_decode(context, batch);
+
+    if (err_code != 0) {
+        std::cerr << "Failed to decode the batch of tokens. Error code: " << err_code << std::endl;
+        return 1;
+    } else {
+        std::cout << "Batch decoded successfully." << std::endl;
+    }
+
+    std::cout << "set the last token's logits to 1" << std::endl;
+
+    llama_sampler_chain_params sampler_params = llama_sampler_chain_default_params();
+    sampler_params.no_perf = false; // Enable performance timings for the sampler chain
+    llama_sampler * sampler = llama_sampler_chain_init(sampler_params);
+    llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
+
+    std::string output_text;
+    int max_token_out = 100; // Maximum number of tokens to sample
+
+    /* inference loop */
+    for(int i = 0; i < max_token_out; ++i) {
+        llama_token next_token;
+        next_token = llama_sampler_sample(sampler, context, -1); // Sample from the last token in the batch
+
+        if(next_token < 0) {
+            std::cerr << "Failed to sample the next token. Error code: " << next_token << std::endl;
+            break;
+        }   
+
+        if (llama_vocab_is_eog(vocab, next_token)) { // Assuming 0 is the end-of-sequence token
+            break;
+        }
+        
+        char buffer[256];
+        int32_t piece_len = llama_token_to_piece(vocab, next_token, buffer, sizeof(buffer), 0, true);
+        if (piece_len > 0) {
+            output_text += std::string(buffer, piece_len);
+        }
+
+        batch = llama_batch_get_one(&next_token, 1);
+        err_code = llama_decode(context, batch);
+        if(err_code != 0) {
+            std::cerr << "Failed to decode the next token. Error code: " << err_code << std::endl;
+            break;
+        }
+    }
+
+    std::cout << "Detokenized output: " << output_text << std::endl;
+
 
     llama_model_free(model);
     llama_backend_free();
