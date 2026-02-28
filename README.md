@@ -25,3 +25,7 @@
 
 ### 26th Feb:
 - model loading, context init, MQTT setup
+
+### 28th Feb:
+- full inference pipeline and generation loop setup
+- getting the output in JSON format
