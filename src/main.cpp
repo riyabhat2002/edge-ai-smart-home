@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
     }
     std::cout << "Context initialized successfully." << std::endl;
 
-    const llama_vocab *vocab =  llama_model_get_vocab(model);
+    const llama_vocab *vocab = llama_model_get_vocab(model);
 
     if (vocab == nullptr) {
         std::cerr << "Failed to retrieve the vocabulary from the model." << std::endl;
@@ -47,16 +47,23 @@ int main(int argc, char *argv[])
     std::string input_text;
     std::getline(std::cin, input_text); // Wait for user input before proceeding with tokenization
 
+    std::string prompt = "<|start_header_id|>system<|end_header_id|>\n"
+    "You are a smart home controller. You must ONLY respond with a JSON object "
+    "containing device, action, and parameters fields. Never respond with plain text.\n"
+    "<|eot_id|><|start_header_id|>user<|end_header_id|>\n"
+    + input_text +
+    "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n";
+
     int32_t n_tokens_max = 128;
     std::vector<llama_token> token_buffer(n_tokens_max); // Create a buffer to hold the tokens
-    int32_t text_len = input_text.length(); // Length of the input text "It is dark in here."
+    int32_t text_len = prompt.length(); // Length of the input text "It is dark in here."
     if(text_len == 0) {
         std::cerr << "Input text is empty. Please provide a valid input." << std::endl;   
         return 1;
     }
-    int32_t tokens_count = llama_tokenize(vocab, input_text.c_str(), text_len, token_buffer.data(), token_buffer.size(),
+    int32_t tokens_count = llama_tokenize(vocab, prompt.c_str(), text_len, token_buffer.data(), token_buffer.size(),
                             true,
-                            false); 
+                            true); 
 
     if (tokens_count < 0) {
         std::cerr << "Failed to tokenize the input text." << std::endl;  
@@ -81,8 +88,6 @@ int main(int argc, char *argv[])
         std::cout << "Batch decoded successfully." << std::endl;
     }
 
-    std::cout << "set the last token's logits to 1" << std::endl;
-
     llama_sampler_chain_params sampler_params = llama_sampler_chain_default_params();
     sampler_params.no_perf = false; // Enable performance timings for the sampler chain
     llama_sampler * sampler = llama_sampler_chain_init(sampler_params);
@@ -106,7 +111,7 @@ int main(int argc, char *argv[])
         }
         
         char buffer[256];
-        int32_t piece_len = llama_token_to_piece(vocab, next_token, buffer, sizeof(buffer), 0, true);
+        int32_t piece_len = llama_token_to_piece(vocab, next_token, buffer, sizeof(buffer), 0, false);
         if (piece_len > 0) {
             output_text += std::string(buffer, piece_len);
         }
