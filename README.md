@@ -29,3 +29,7 @@
 ### 28th Feb:
 - full inference pipeline and generation loop setup
 - getting the output in JSON format
+
+### 1st Mar
+- Modularized code
+- Added MQTTClient by implementing mosquitto_loop_start and condition_variable synchronization to replace manual polling, successfully resolving a race-condition-induced segmentation fault and achieving thread-safe asynchronous messaging for the inference gateway.
